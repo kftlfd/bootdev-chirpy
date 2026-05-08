@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync/atomic"
 )
 
@@ -55,9 +56,9 @@ func main() {
 		}
 
 		type okResBody struct {
-			Valid bool `json:"valid"`
+			CleanedBody string `json:"cleaned_body"`
 		}
-		respBody := okResBody{Valid: true}
+		respBody := okResBody{CleanedBody: censorChirp(body.Body)}
 		data, err := json.Marshal(respBody)
 		if err != nil {
 			log.Printf("Error marshalling JSON: %s", err)
@@ -112,4 +113,32 @@ func middlewareLog(next http.Handler) http.Handler {
 		log.Printf("%s %s", r.Method, r.URL.Path)
 		next.ServeHTTP(w, r)
 	})
+}
+
+var badWords = map[string]struct{}{}
+
+func init() {
+	addBadWord := func(w string) {
+		badWords[w] = struct{}{}
+	}
+	addBadWord("kerfuffle")
+	addBadWord("sharbert")
+	addBadWord("fornax")
+}
+
+func isBadWord(word string) bool {
+	_, ok := badWords[word]
+	return ok
+}
+
+func censorChirp(chirp string) string {
+	words := strings.Split(chirp, " ")
+
+	for i, word := range words {
+		if isBadWord(strings.ToLower(word)) {
+			words[i] = "****"
+		}
+	}
+
+	return strings.Join(words, " ")
 }
