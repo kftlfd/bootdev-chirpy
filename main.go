@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -23,6 +24,50 @@ func main() {
 
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 	mux.HandleFunc("POST /admin/reset", cfg.resetMetricsHandler)
+
+	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
+		type reqBody struct {
+			Body string `json:"body"`
+		}
+		decoder := json.NewDecoder(r.Body)
+		body := reqBody{}
+		if err := decoder.Decode(&body); err != nil {
+			log.Printf("Error decoding parameters: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if len(body.Body) > 140 {
+			type errRespoBody struct {
+				Error string `json:"error"`
+			}
+			respBody := errRespoBody{Error: "Chirp is too long"}
+			data, err := json.Marshal(respBody)
+			if err != nil {
+				log.Printf("Error marshalling JSON: %s", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf8")
+			w.Write(data)
+			return
+		}
+
+		type okResBody struct {
+			Valid bool `json:"valid"`
+		}
+		respBody := okResBody{Valid: true}
+		data, err := json.Marshal(respBody)
+		if err != nil {
+			log.Printf("Error marshalling JSON: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf8")
+		w.Write(data)
+	})
 
 	mux.Handle("/app/", cfg.middlewareMetricsInc(newAppFsHandler("/app/")))
 
