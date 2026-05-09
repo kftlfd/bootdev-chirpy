@@ -1,15 +1,40 @@
 package main
 
 import (
+	"chirpy/internal/database"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
+type apiConfig struct {
+	db             *database.Queries
+	fileserverHits atomic.Int32
+}
+
 func main() {
+	godotenv.Load()
+
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatalf("Error opening DB: %w", err)
+	}
+
+	dbQueries := database.New(db)
+
+	cfg := &apiConfig{
+		db: dbQueries,
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -21,8 +46,6 @@ func main() {
 		}
 	})
 
-	cfg := &apiConfig{}
-
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 	mux.HandleFunc("POST /admin/reset", cfg.resetMetricsHandler)
 
@@ -30,6 +53,7 @@ func main() {
 		type reqBody struct {
 			Body string `json:"body"`
 		}
+		defer r.Body.Close()
 		decoder := json.NewDecoder(r.Body)
 		body := reqBody{}
 		if err := decoder.Decode(&body); err != nil {
@@ -74,10 +98,6 @@ func main() {
 
 	server := http.Server{Handler: mux, Addr: ":8080"}
 	log.Fatal(server.ListenAndServe())
-}
-
-type apiConfig struct {
-	fileserverHits atomic.Int32
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
