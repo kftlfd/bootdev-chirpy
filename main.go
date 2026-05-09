@@ -53,51 +53,6 @@ func main() {
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 	mux.HandleFunc("POST /admin/reset", cfg.resetMetricsHandler)
 
-	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
-		type reqBody struct {
-			Body string `json:"body"`
-		}
-		defer r.Body.Close()
-		decoder := json.NewDecoder(r.Body)
-		body := reqBody{}
-		if err := decoder.Decode(&body); err != nil {
-			log.Printf("Error decoding parameters: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		if len(body.Body) > 140 {
-			type errRespoBody struct {
-				Error string `json:"error"`
-			}
-			respBody := errRespoBody{Error: "Chirp is too long"}
-			data, err := json.Marshal(respBody)
-			if err != nil {
-				log.Printf("Error marshalling JSON: %s", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.WriteHeader(http.StatusBadRequest)
-			w.Header().Set("Content-Type", "application/json; charset=utf8")
-			w.Write(data)
-			return
-		}
-
-		type okResBody struct {
-			CleanedBody string `json:"cleaned_body"`
-		}
-		respBody := okResBody{CleanedBody: censorChirp(body.Body)}
-		data, err := json.Marshal(respBody)
-		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json; charset=utf8")
-		w.Write(data)
-	})
-
 	mux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		reqBody := struct {
@@ -127,6 +82,71 @@ func main() {
 			CreatedAt: user.CreatedAt,
 			UpdatedAt: user.UpdatedAt,
 			Email:     user.Email,
+		}
+		data, err := json.Marshal(respBody)
+		if err != nil {
+			log.Printf("Error creating response body: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		w.Header().Set("Content-Type", "application/json; charset=utf8")
+		w.Write(data)
+	})
+
+	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		reqBody := struct {
+			Body   string    `json:"body"`
+			UserId uuid.UUID `json:"user_id"`
+		}{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&reqBody); err != nil {
+			log.Printf("Error decoding parameters: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if len(reqBody.Body) > 140 {
+			type errRespoBody struct {
+				Error string `json:"error"`
+			}
+			respBody := errRespoBody{Error: "Chirp is too long"}
+			data, err := json.Marshal(respBody)
+			if err != nil {
+				log.Printf("Error marshalling JSON: %s", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json; charset=utf8")
+			w.Write(data)
+			return
+		}
+
+		chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
+			Body:   censorChirp(reqBody.Body),
+			UserID: reqBody.UserId,
+		})
+		if err != nil {
+			log.Printf("Error creating chirp: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		respBody := struct {
+			Id        uuid.UUID `json:"id"`
+			CreatedAt time.Time `json:"created_at"`
+			UpdatedAt time.Time `json:"updated_at"`
+			Body      string    `json:"body"`
+			UserId    uuid.UUID `json:"user_id"`
+		}{
+			Id:        chirp.ID,
+			CreatedAt: chirp.CreatedAt,
+			UpdatedAt: chirp.UpdatedAt,
+			Body:      chirp.Body,
+			UserId:    chirp.UserID,
 		}
 		data, err := json.Marshal(respBody)
 		if err != nil {
