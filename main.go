@@ -10,12 +10,15 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
+	isDev          bool
 	db             *database.Queries
 	fileserverHits atomic.Int32
 }
@@ -26,13 +29,14 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
-		log.Fatalf("Error opening DB: %w", err)
+		log.Fatalf("Error opening DB: %s", err)
 	}
 
 	dbQueries := database.New(db)
 
 	cfg := &apiConfig{
-		db: dbQueries,
+		isDev: os.Getenv("PLATFORM") == "dev",
+		db:    dbQueries,
 	}
 
 	mux := http.NewServeMux()
@@ -94,6 +98,48 @@ func main() {
 		w.Write(data)
 	})
 
+	mux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		reqBody := struct {
+			Email string `json:"email"`
+		}{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&reqBody); err != nil {
+			log.Printf("Error decoding parameters: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		user, err := cfg.db.CreateUser(r.Context(), reqBody.Email)
+		if err != nil {
+			log.Printf("Error creating user: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		respBody := struct {
+			Id        uuid.UUID `json:"id"`
+			CreatedAt time.Time `json:"created_at"`
+			UpdatedAt time.Time `json:"updated_at"`
+			Email     string    `json:"email"`
+		}{
+			Id:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		}
+		data, err := json.Marshal(respBody)
+		if err != nil {
+			log.Printf("Error creating response body: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		w.Header().Set("Content-Type", "application/json; charset=utf8")
+		w.Write(data)
+	})
+
 	mux.Handle("/app/", cfg.middlewareMetricsInc(newAppFsHandler("/app/")))
 
 	server := http.Server{Handler: mux, Addr: ":8080"}
@@ -120,6 +166,18 @@ func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) resetMetricsHandler(w http.ResponseWriter, r *http.Request) {
+	if !cfg.isDev {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	err := cfg.db.ResetUsers(r.Context())
+	if err != nil {
+		log.Printf("reset users error: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 	cfg.fileserverHits.Store(0)
 }
