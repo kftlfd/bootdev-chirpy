@@ -191,6 +191,41 @@ func main() {
 		w.Write(data)
 	})
 
+	mux.HandleFunc("GET /api/chirps/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "text/plain; charset=utf8")
+			w.Write([]byte("Invalid ID"))
+			return
+		}
+
+		chirp, err := cfg.db.GetChirpById(r.Context(), id)
+		if err != nil {
+			log.Printf("Error getting chirp: %s", err)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		type ChirpDto struct {
+			ID        uuid.UUID `json:"id"`
+			CreatedAt time.Time `json:"created_at"`
+			UpdatedAt time.Time `json:"updated_at"`
+			Body      string    `json:"body"`
+			UserID    uuid.UUID `json:"user_id"`
+		}
+		data, err := json.Marshal(ChirpDto(chirp))
+		if err != nil {
+			log.Printf("Error creating response data: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf8")
+		w.Write(data)
+	})
+
 	mux.Handle("/app/", cfg.middlewareMetricsInc(newAppFsHandler("/app/")))
 
 	server := http.Server{Handler: mux, Addr: ":8080"}
