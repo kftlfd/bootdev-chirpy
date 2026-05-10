@@ -160,6 +160,37 @@ func main() {
 		w.Write(data)
 	})
 
+	mux.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) {
+		chirps, err := cfg.db.GetAllChirps(r.Context())
+		if err != nil {
+			log.Printf("Error getting chirps: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		type ChirpDto struct {
+			ID        uuid.UUID `json:"id"`
+			CreatedAt time.Time `json:"created_at"`
+			UpdatedAt time.Time `json:"updated_at"`
+			Body      string    `json:"body"`
+			UserID    uuid.UUID `json:"user_id"`
+		}
+		dtos := make([]ChirpDto, len(chirps))
+		for i, chirp := range chirps {
+			dtos[i] = ChirpDto(chirp)
+		}
+		data, err := json.Marshal(dtos)
+		if err != nil {
+			log.Printf("Error creating response data: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf8")
+		w.Write(data)
+	})
+
 	mux.Handle("/app/", cfg.middlewareMetricsInc(newAppFsHandler("/app/")))
 
 	server := http.Server{Handler: mux, Addr: ":8080"}

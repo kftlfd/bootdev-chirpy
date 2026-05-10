@@ -11,3 +11,6 @@ RETURNING *;
 
 -- name: ResetChirps :exec
 TRUNCATE TABLE chirps CASCADE;
+
+-- name: GetAllChirps :many
+SELECT * FROM chirps ORDER BY created_at ASC;
