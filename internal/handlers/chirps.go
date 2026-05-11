@@ -4,7 +4,9 @@ import (
 	"chirpy/internal/auth"
 	"chirpy/internal/config"
 	"chirpy/internal/database"
+	u "chirpy/internal/utils"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -64,7 +66,11 @@ func censorChirp(chirp string) string {
 	return strings.Join(words, " ")
 }
 
-func (h *HandlerChirps) CreateChirp(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerChirps) CreateChirp() http.Handler {
+	return auth.WithAuth(h.cfg, http.HandlerFunc(h.createChirp))
+}
+
+func (h *HandlerChirps) createChirp(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	reqBody := struct {
 		Body   string    `json:"body"`
@@ -77,19 +83,7 @@ func (h *HandlerChirps) CreateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenStr, err := auth.GetBearerToken(r.Header)
-	if err != nil {
-		log.Printf("Error getting auth token: %s", err)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	userId, err := auth.ValidateJWT(tokenStr, h.cfg.Env.ServerSecret)
-	if err != nil {
-		log.Printf("Error validating jwt: %s", err)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+	userId := auth.RequireAuthUser(r.Context())
 
 	if len(reqBody.Body) > 140 {
 		type errRespoBody struct {
@@ -207,4 +201,48 @@ func (h *HandlerChirps) GetChirp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json; charset=utf8")
 	w.Write(data)
+}
+
+func (h *HandlerChirps) DeleteChirp() http.Handler {
+	return auth.WithAuth(h.cfg, http.HandlerFunc(h.deleteChirp))
+}
+
+func (h *HandlerChirps) deleteChirp(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		u.SendJSON(w, http.StatusBadRequest, u.D{
+			"error": fmt.Sprintf("Invalid url id: %s", err),
+		})
+		return
+	}
+
+	chirp, err := h.db.GetChirpById(r.Context(), id)
+	if err != nil {
+		u.SendJSON(w, http.StatusNotFound, u.D{
+			"error": fmt.Sprintf("not found: %s", err),
+		})
+		return
+	}
+
+	userId := auth.RequireAuthUser(r.Context())
+
+	if chirp.UserID != userId {
+		u.SendJSON(w, http.StatusForbidden, u.D{
+			"error": "can delete only your own chirps",
+		})
+		return
+	}
+
+	err = h.db.DeleteChirp(r.Context(), database.DeleteChirpParams{
+		UserID: userId,
+		ID:     id,
+	})
+	if err != nil {
+		u.SendJSON(w, http.StatusInternalServerError, u.D{
+			"error": fmt.Sprintf("Error deleting chirp: %s", err),
+		})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
