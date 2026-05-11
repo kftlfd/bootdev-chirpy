@@ -6,6 +6,8 @@ import (
 	"net/http"
 )
 
+type D map[string]string
+
 func SendJSON(w http.ResponseWriter, status int, data any) {
 	body, err := json.Marshal(data)
 	if err != nil {
