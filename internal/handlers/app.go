@@ -23,5 +23,5 @@ func (h *HandlerApp) middlewareMetricsInc(next http.Handler) http.Handler {
 }
 
 func (h *HandlerApp) ServeAppFiles(prefix string) http.Handler {
-	return h.middlewareMetricsInc(http.StripPrefix(prefix, http.FileServer(http.Dir("."))))
+	return h.middlewareMetricsInc(http.StripPrefix(prefix, http.FileServer(http.Dir("public"))))
 }
