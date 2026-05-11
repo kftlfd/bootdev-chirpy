@@ -4,8 +4,9 @@ import (
 	"chirpy/internal/auth"
 	"chirpy/internal/config"
 	"chirpy/internal/database"
+	u "chirpy/internal/utils"
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -37,17 +38,18 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}{}
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&reqBody); err != nil {
-		log.Printf("Error decoding parameters: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		u.SendJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Error decoding parameters: %s", err),
+		})
 		return
 	}
 
 	passwordHash, err := auth.HashPassword(reqBody.Password)
 	if err != nil {
-		log.Printf("Error creating password hash: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		u.SendJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Error creating password hash: %s", err),
+		})
 		return
 	}
 
@@ -56,8 +58,9 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		HashedPassword: passwordHash,
 	})
 	if err != nil {
-		log.Printf("Error creating user: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		u.SendJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Error creating user: %s", err),
+		})
 		return
 	}
 
@@ -72,82 +75,129 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
 	}
-	data, err := json.Marshal(respBody)
-	if err != nil {
-		log.Printf("Error creating response body: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusCreated)
-	w.Header().Set("Content-Type", "application/json; charset=utf8")
-	w.Write(data)
+	u.SendJSON(w, http.StatusCreated, respBody)
 }
 
 func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	reqBody := struct {
-		Email            string `json:"email"`
-		Password         string `json:"password"`
-		ExpiresInSeconds *int   `json:"expires_in_seconds"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}{}
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&reqBody); err != nil {
-		log.Printf("Error decoding parameters: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		u.SendJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Error decoding params: %s", err),
+		})
 		return
 	}
 
 	user, err := h.db.GetUserByEmail(r.Context(), reqBody.Email)
 	if err != nil {
-		log.Printf("Error getting user: %s", err)
-		w.WriteHeader(http.StatusNotFound)
+		u.SendJSON(w, http.StatusNotFound, map[string]string{
+			"error": fmt.Sprintf("Error getting user: %s", err),
+		})
 		return
 	}
 
 	passwordOk, err := auth.CheckPasswordHash(reqBody.Password, user.HashedPassword)
 	if err != nil {
-		log.Printf("Error creating password hash: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		u.SendJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Error creating password hash: %s", err),
+		})
 		return
 	}
 	if !passwordOk {
-		w.WriteHeader(http.StatusUnauthorized)
+		u.SendJSON(w, http.StatusUnauthorized, map[string]string{
+			"error": "Invalid password",
+		})
 		return
 	}
 
-	tokenExp := time.Hour
-	if reqBody.ExpiresInSeconds != nil {
-		tokenExp = time.Second * time.Duration(*reqBody.ExpiresInSeconds)
-	}
-	token, err := auth.MakeJWT(user.ID, h.cfg.Env.ServerSecret, tokenExp)
+	token, err := auth.MakeJWT(user.ID, h.cfg.Env.ServerSecret, time.Hour)
 	if err != nil {
-		log.Printf("Error creating jwt: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		u.SendJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Error creating jwt: %s", err),
+		})
+		return
+	}
+
+	rtData := auth.MakeRefreshToken()
+	refreshToken, err := h.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     rtData,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+	})
+	if err != nil {
+		u.SendJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Error creating refresh token: %s", err),
+		})
 		return
 	}
 
 	respBody := struct {
-		Id        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
-		Token     string    `json:"token"`
+		Id           uuid.UUID `json:"id"`
+		CreatedAt    time.Time `json:"created_at"`
+		UpdatedAt    time.Time `json:"updated_at"`
+		Email        string    `json:"email"`
+		Token        string    `json:"token"`
+		RefreshToken string    `json:"refresh_token"`
 	}{
-		Id:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
-		Token:     token,
+		Id:           user.ID,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		Email:        user.Email,
+		Token:        token,
+		RefreshToken: refreshToken.Token,
 	}
-	data, err := json.Marshal(respBody)
+	u.SendJSON(w, http.StatusOK, respBody)
+}
+
+func (h *HandlerUsers) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	rToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		log.Printf("Error creating response body: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		u.SendJSON(w, http.StatusUnauthorized, map[string]string{
+			"error": fmt.Sprintf("Error getting auth token: %s", err),
+		})
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json; charset=utf8")
-	w.Write(data)
+	token, err := h.db.GetRefreshToken(r.Context(), rToken)
+	if err != nil {
+		u.SendJSON(w, http.StatusUnauthorized, map[string]string{
+			"error": fmt.Sprintf("Error getting refresh token from DB: %s", err),
+		})
+		return
+	}
+
+	jwt, err := auth.MakeJWT(token.UserID, h.cfg.Env.ServerSecret, time.Hour)
+	if err != nil {
+		u.SendJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Error creating jwt: %s", err),
+		})
+		return
+	}
+
+	u.SendJSON(w, http.StatusOK, map[string]string{
+		"token": jwt,
+	})
+}
+
+func (h *HandlerUsers) RevokeToken(w http.ResponseWriter, r *http.Request) {
+	rToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		u.SendJSON(w, http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("Error getting auth token: %s", err),
+		})
+		return
+	}
+
+	err = h.db.MarkTokenRevoked(r.Context(), rToken)
+	if err != nil {
+		u.SendJSON(w, http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("Error marking token revoked: %s", err),
+		})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

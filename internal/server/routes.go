@@ -7,6 +7,8 @@ func (s *Server) registerRoutes() {
 
 	s.mux.HandleFunc("POST /api/users", s.handlerUsers.CreateUser)
 	s.mux.HandleFunc("POST /api/login", s.handlerUsers.Login)
+	s.mux.HandleFunc("POST /api/refresh", s.handlerUsers.RefreshToken)
+	s.mux.HandleFunc("POST /api/revoke", s.handlerUsers.RevokeToken)
 
 	s.mux.HandleFunc("POST /api/chirps", s.handlerChirps.CreateChirp)
 	s.mux.HandleFunc("GET /api/chirps", s.handlerChirps.GetAllChirps)
