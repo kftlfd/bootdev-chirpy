@@ -16,6 +16,10 @@ type HandlerUsers struct {
 }
 
 func NewHandlerUsers(db *database.Queries) *HandlerUsers {
+	if db == nil {
+		panic("db is nill")
+	}
+
 	return &HandlerUsers{
 		db: db,
 	}

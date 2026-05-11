@@ -14,6 +14,13 @@ type HandlerAdmin struct {
 }
 
 func NewHandlerAdmin(cfg *config.Config, db *database.Queries) *HandlerAdmin {
+	if cfg == nil {
+		panic("cfg is nil")
+	}
+	if db == nil {
+		panic("db is nil")
+	}
+
 	return &HandlerAdmin{
 		cfg: cfg,
 		db:  db,

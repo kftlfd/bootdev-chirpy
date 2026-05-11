@@ -16,6 +16,10 @@ type HandlerChirps struct {
 }
 
 func NewHandlerChirps(db *database.Queries) *HandlerChirps {
+	if db == nil {
+		panic("db is nill")
+	}
+
 	return &HandlerChirps{
 		db: db,
 	}

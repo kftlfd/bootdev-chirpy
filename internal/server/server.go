@@ -21,6 +21,19 @@ type Deps struct {
 }
 
 func New(deps Deps) *Server {
+	if deps.HandlerAdmin == nil {
+		panic("admin handler is nil")
+	}
+	if deps.HandlerUsers == nil {
+		panic("users handler is nil")
+	}
+	if deps.HandlerChirps == nil {
+		panic("chirps handler is nil")
+	}
+	if deps.HandlerApp == nil {
+		panic("app handler is nil")
+	}
+
 	s := &Server{
 		mux:           http.NewServeMux(),
 		handlerAdmin:  deps.HandlerAdmin,

@@ -12,17 +12,19 @@ import (
 	_ "github.com/lib/pq"
 )
 
+func newDB(dbUrl string) *database.Queries {
+	dbConn, err := sql.Open("postgres", dbUrl)
+	if err != nil {
+		log.Panicf("Error opening DB: %s", err)
+	}
+	return database.New(dbConn)
+}
+
 func main() {
 	godotenv.Load()
 
 	cfg := config.Load()
-
-	dbConn, err := sql.Open("postgres", cfg.Env.DBUrl)
-	if err != nil {
-		log.Fatalf("Error opening DB: %s", err)
-		return
-	}
-	db := database.New(dbConn)
+	db := newDB(cfg.Env.DBUrl)
 
 	handlerAdmin := handlers.NewHandlerAdmin(cfg, db)
 	handlerUsers := handlers.NewHandlerUsers(db)

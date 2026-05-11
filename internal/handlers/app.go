@@ -10,6 +10,10 @@ type HandlerApp struct {
 }
 
 func NewHandlerApp(cfg *config.Config) *HandlerApp {
+	if cfg == nil {
+		panic("cfg is nil")
+	}
+
 	return &HandlerApp{
 		cfg: cfg,
 	}
