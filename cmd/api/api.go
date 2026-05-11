@@ -27,8 +27,8 @@ func main() {
 	db := newDB(cfg.Env.DBUrl)
 
 	handlerAdmin := handlers.NewHandlerAdmin(cfg, db)
-	handlerUsers := handlers.NewHandlerUsers(db)
-	handlerChirps := handlers.NewHandlerChirps(db)
+	handlerUsers := handlers.NewHandlerUsers(cfg, db)
+	handlerChirps := handlers.NewHandlerChirps(cfg, db)
 	handlerApp := handlers.NewHandlerApp(cfg)
 
 	server := server.New(server.Deps{

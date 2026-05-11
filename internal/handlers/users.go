@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"chirpy/internal/auth"
+	"chirpy/internal/config"
 	"chirpy/internal/database"
 	"encoding/json"
 	"log"
@@ -12,16 +13,21 @@ import (
 )
 
 type HandlerUsers struct {
-	db *database.Queries
+	cfg *config.Config
+	db  *database.Queries
 }
 
-func NewHandlerUsers(db *database.Queries) *HandlerUsers {
+func NewHandlerUsers(cfg *config.Config, db *database.Queries) *HandlerUsers {
+	if cfg == nil {
+		panic("cfg is nil")
+	}
 	if db == nil {
 		panic("db is nill")
 	}
 
 	return &HandlerUsers{
-		db: db,
+		cfg: cfg,
+		db:  db,
 	}
 }
 
@@ -81,8 +87,9 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	reqBody := struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email            string `json:"email"`
+		Password         string `json:"password"`
+		ExpiresInSeconds *int   `json:"expires_in_seconds"`
 	}{}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&reqBody); err != nil {
@@ -109,16 +116,29 @@ func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tokenExp := time.Hour
+	if reqBody.ExpiresInSeconds != nil {
+		tokenExp = time.Second * time.Duration(*reqBody.ExpiresInSeconds)
+	}
+	token, err := auth.MakeJWT(user.ID, h.cfg.Env.ServerSecret, tokenExp)
+	if err != nil {
+		log.Printf("Error creating jwt: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	respBody := struct {
 		Id        uuid.UUID `json:"id"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 		Email     string    `json:"email"`
+		Token     string    `json:"token"`
 	}{
 		Id:        user.ID,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
+		Token:     token,
 	}
 	data, err := json.Marshal(respBody)
 	if err != nil {

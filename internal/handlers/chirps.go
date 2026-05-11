@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"chirpy/internal/auth"
+	"chirpy/internal/config"
 	"chirpy/internal/database"
 	"encoding/json"
 	"log"
@@ -12,16 +14,21 @@ import (
 )
 
 type HandlerChirps struct {
-	db *database.Queries
+	cfg *config.Config
+	db  *database.Queries
 }
 
-func NewHandlerChirps(db *database.Queries) *HandlerChirps {
+func NewHandlerChirps(cfg *config.Config, db *database.Queries) *HandlerChirps {
+	if cfg == nil {
+		panic("cfg is nil")
+	}
 	if db == nil {
 		panic("db is nill")
 	}
 
 	return &HandlerChirps{
-		db: db,
+		cfg: cfg,
+		db:  db,
 	}
 }
 
@@ -70,6 +77,20 @@ func (h *HandlerChirps) CreateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tokenStr, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error getting auth token: %s", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	userId, err := auth.ValidateJWT(tokenStr, h.cfg.Env.ServerSecret)
+	if err != nil {
+		log.Printf("Error validating jwt: %s", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	if len(reqBody.Body) > 140 {
 		type errRespoBody struct {
 			Error string `json:"error"`
@@ -89,7 +110,7 @@ func (h *HandlerChirps) CreateChirp(w http.ResponseWriter, r *http.Request) {
 
 	chirp, err := h.db.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   censorChirp(reqBody.Body),
-		UserID: reqBody.UserId,
+		UserID: userId,
 	})
 	if err != nil {
 		log.Printf("Error creating chirp: %s", err)

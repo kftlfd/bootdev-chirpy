@@ -15,12 +15,11 @@ func TestMakeJwt(t *testing.T) {
 
 	token, err := auth.MakeJWT(id, tokenSecret, time.Minute)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if len(token) < 1 {
-		t.Error("empty token")
+		t.Fatal("empty token")
 	}
 }
 
@@ -29,17 +28,15 @@ func TestValidateJWT(t *testing.T) {
 
 	token, err := auth.MakeJWT(id, tokenSecret, time.Minute)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	userId, err := auth.ValidateJWT(token, tokenSecret)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	if id != userId {
-		t.Error("ids don't match")
+		t.Fatal("ids don't match")
 	}
 }

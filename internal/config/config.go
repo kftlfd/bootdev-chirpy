@@ -6,8 +6,9 @@ import (
 )
 
 type EnvVars struct {
-	IsDev bool
-	DBUrl string
+	IsDev        bool
+	ServerSecret string
+	DBUrl        string
 }
 
 type Config struct {
@@ -17,8 +18,9 @@ type Config struct {
 
 func Load() *Config {
 	env := EnvVars{
-		IsDev: os.Getenv("PLATFORM") == "dev",
-		DBUrl: os.Getenv("DB_URL"),
+		IsDev:        os.Getenv("PLATFORM") == "dev",
+		ServerSecret: os.Getenv("SERVER_SECRET"),
+		DBUrl:        os.Getenv("DB_URL"),
 	}
 
 	cfg := &Config{
