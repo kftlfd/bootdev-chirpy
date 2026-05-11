@@ -5,9 +5,7 @@ import (
 	"chirpy/internal/config"
 	"chirpy/internal/database"
 	u "chirpy/internal/utils"
-	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -32,6 +30,18 @@ func NewHandlerChirps(cfg *config.Config, db *database.Queries) *HandlerChirps {
 		cfg: cfg,
 		db:  db,
 	}
+}
+
+type chirpDto struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
+}
+
+func toChirpDTO(chirp database.Chirp) chirpDto {
+	return chirpDto(chirp)
 }
 
 func createBadWordsMap() map[string]struct{} {
@@ -71,136 +81,69 @@ func (h *HandlerChirps) CreateChirp() http.Handler {
 }
 
 func (h *HandlerChirps) createChirp(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
 	reqBody := struct {
 		Body   string    `json:"body"`
 		UserId uuid.UUID `json:"user_id"`
 	}{}
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&reqBody); err != nil {
-		log.Printf("Error decoding parameters: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+
+	if err := u.DecodeJSON(r, &reqBody); err != nil {
+		u.SendJSONError(w, http.StatusInternalServerError,
+			fmt.Sprintf("Error decoding parameters: %s", err))
+		return
+	}
+
+	if len(reqBody.Body) > 140 {
+		u.SendJSONError(w, http.StatusBadRequest, "Chirp is too long")
 		return
 	}
 
 	userId := auth.RequireAuthUser(r.Context())
-
-	if len(reqBody.Body) > 140 {
-		type errRespoBody struct {
-			Error string `json:"error"`
-		}
-		respBody := errRespoBody{Error: "Chirp is too long"}
-		data, err := json.Marshal(respBody)
-		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		w.Header().Set("Content-Type", "application/json; charset=utf8")
-		w.Write(data)
-		return
-	}
 
 	chirp, err := h.db.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   censorChirp(reqBody.Body),
 		UserID: userId,
 	})
 	if err != nil {
-		log.Printf("Error creating chirp: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		u.SendJSONError(w, http.StatusInternalServerError,
+			fmt.Sprintf("Error creating chirp: %s", err))
 		return
 	}
 
-	respBody := struct {
-		Id        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Body      string    `json:"body"`
-		UserId    uuid.UUID `json:"user_id"`
-	}{
-		Id:        chirp.ID,
-		CreatedAt: chirp.CreatedAt,
-		UpdatedAt: chirp.UpdatedAt,
-		Body:      chirp.Body,
-		UserId:    chirp.UserID,
-	}
-	data, err := json.Marshal(respBody)
-	if err != nil {
-		log.Printf("Error creating response body: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusCreated)
-	w.Header().Set("Content-Type", "application/json; charset=utf8")
-	w.Write(data)
+	u.SendJSON(w, http.StatusCreated, toChirpDTO(chirp))
 }
 
 func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
 	chirps, err := h.db.GetAllChirps(r.Context())
 	if err != nil {
-		log.Printf("Error getting chirps: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		u.SendJSONError(w, http.StatusInternalServerError,
+			fmt.Sprintf("Error getting chirps: %s", err))
 		return
 	}
 
-	type ChirpDto struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Body      string    `json:"body"`
-		UserID    uuid.UUID `json:"user_id"`
-	}
-	dtos := make([]ChirpDto, len(chirps))
+	dtos := make([]chirpDto, len(chirps))
 	for i, chirp := range chirps {
-		dtos[i] = ChirpDto(chirp)
-	}
-	data, err := json.Marshal(dtos)
-	if err != nil {
-		log.Printf("Error creating response data: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		dtos[i] = toChirpDTO(chirp)
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json; charset=utf8")
-	w.Write(data)
+	u.SendJSON(w, http.StatusOK, dtos)
 }
 
 func (h *HandlerChirps) GetChirp(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Header().Set("Content-Type", "text/plain; charset=utf8")
-		w.Write([]byte("Invalid ID"))
+		u.SendJSONError(w, http.StatusBadRequest,
+			fmt.Sprintf("Invalid ID: %s", err))
 		return
 	}
 
 	chirp, err := h.db.GetChirpById(r.Context(), id)
 	if err != nil {
-		log.Printf("Error getting chirp: %s", err)
-		w.WriteHeader(http.StatusNotFound)
+		u.SendJSONError(w, http.StatusNotFound,
+			fmt.Sprintf("Error getting chirp: %s", err))
 		return
 	}
 
-	type ChirpDto struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Body      string    `json:"body"`
-		UserID    uuid.UUID `json:"user_id"`
-	}
-	data, err := json.Marshal(ChirpDto(chirp))
-	if err != nil {
-		log.Printf("Error creating response data: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json; charset=utf8")
-	w.Write(data)
+	u.SendJSON(w, http.StatusOK, toChirpDTO(chirp))
 }
 
 func (h *HandlerChirps) DeleteChirp() http.Handler {
@@ -210,26 +153,22 @@ func (h *HandlerChirps) DeleteChirp() http.Handler {
 func (h *HandlerChirps) deleteChirp(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		u.SendJSON(w, http.StatusBadRequest, u.D{
-			"error": fmt.Sprintf("Invalid url id: %s", err),
-		})
+		u.SendJSONError(w, http.StatusBadRequest,
+			fmt.Sprintf("Invalid url id: %s", err))
 		return
 	}
 
 	chirp, err := h.db.GetChirpById(r.Context(), id)
 	if err != nil {
-		u.SendJSON(w, http.StatusNotFound, u.D{
-			"error": fmt.Sprintf("not found: %s", err),
-		})
+		u.SendJSONError(w, http.StatusNotFound,
+			fmt.Sprintf("not found: %s", err))
 		return
 	}
 
 	userId := auth.RequireAuthUser(r.Context())
 
 	if chirp.UserID != userId {
-		u.SendJSON(w, http.StatusForbidden, u.D{
-			"error": "can delete only your own chirps",
-		})
+		u.SendJSONError(w, http.StatusForbidden, "can delete only your own chirps")
 		return
 	}
 
@@ -238,9 +177,8 @@ func (h *HandlerChirps) deleteChirp(w http.ResponseWriter, r *http.Request) {
 		ID:     id,
 	})
 	if err != nil {
-		u.SendJSON(w, http.StatusInternalServerError, u.D{
-			"error": fmt.Sprintf("Error deleting chirp: %s", err),
-		})
+		u.SendJSONError(w, http.StatusInternalServerError,
+			fmt.Sprintf("Error deleting chirp: %s", err))
 		return
 	}
 
