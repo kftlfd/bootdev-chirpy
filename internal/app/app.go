@@ -21,9 +21,10 @@ func BuildApp(cfg *config.Config, dbConn *sql.DB) http.Handler {
 	handlerAdmin := handlers.NewHandlerAdmin(cfg, logger, db, metrics)
 	handlerUsers := handlers.NewHandlerUsers(cfg, logger, db)
 	handlerChirps := handlers.NewHandlerChirps(cfg, logger, db)
-	handlerApp := handlers.NewHandlerApp(metrics)
+	handlerApp := handlers.NewHandlerApp(cfg, metrics)
 
 	return server.New(server.Deps{
+		Config:        cfg,
 		Logger:        logger,
 		HandlerAdmin:  handlerAdmin,
 		HandlerUsers:  handlerUsers,

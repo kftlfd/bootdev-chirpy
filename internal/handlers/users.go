@@ -14,10 +14,9 @@ import (
 )
 
 type HandlerUsers struct {
-	cfg    *config.Config
-	logger *slog.Logger
-	db     *database.Queries
-	res    *httpx.Responder
+	cfg *config.Config
+	db  *database.Queries
+	res *httpx.Responder
 }
 
 func NewHandlerUsers(cfg *config.Config, logger *slog.Logger, db *database.Queries) *HandlerUsers {
@@ -34,10 +33,9 @@ func NewHandlerUsers(cfg *config.Config, logger *slog.Logger, db *database.Queri
 	log := logger.With("module", "handler-users")
 
 	return &HandlerUsers{
-		cfg:    cfg,
-		logger: log,
-		db:     db,
-		res:    httpx.NewResponder(log),
+		cfg: cfg,
+		db:  db,
+		res: httpx.NewResponder(log),
 	}
 }
 
@@ -110,11 +108,7 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	h.res.JSON(w, http.StatusCreated, toUserDTO(user))
 }
 
-func (h *HandlerUsers) UpdateUser() http.Handler {
-	return auth.WithAuth(h.cfg, h.logger, http.HandlerFunc(h.updateUser))
-}
-
-func (h *HandlerUsers) updateUser(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerUsers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	reqBody := struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`

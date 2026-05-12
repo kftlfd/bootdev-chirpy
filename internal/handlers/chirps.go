@@ -16,10 +16,9 @@ import (
 )
 
 type HandlerChirps struct {
-	cfg    *config.Config
-	logger *slog.Logger
-	db     *database.Queries
-	res    *httpx.Responder
+	cfg *config.Config
+	db  *database.Queries
+	res *httpx.Responder
 }
 
 func NewHandlerChirps(cfg *config.Config, logger *slog.Logger, db *database.Queries) *HandlerChirps {
@@ -36,10 +35,9 @@ func NewHandlerChirps(cfg *config.Config, logger *slog.Logger, db *database.Quer
 	log := logger.With("module", "handler-chirps")
 
 	return &HandlerChirps{
-		cfg:    cfg,
-		logger: log,
-		db:     db,
-		res:    httpx.NewResponder(log),
+		cfg: cfg,
+		db:  db,
+		res: httpx.NewResponder(log),
 	}
 }
 
@@ -87,11 +85,7 @@ func censorChirp(chirp string) string {
 	return strings.Join(words, " ")
 }
 
-func (h *HandlerChirps) CreateChirp() http.Handler {
-	return auth.WithAuth(h.cfg, h.logger, http.HandlerFunc(h.createChirp))
-}
-
-func (h *HandlerChirps) createChirp(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerChirps) CreateChirp(w http.ResponseWriter, r *http.Request) {
 	reqBody := struct {
 		Body   string    `json:"body"`
 		UserId uuid.UUID `json:"user_id"`
@@ -179,11 +173,7 @@ func (h *HandlerChirps) GetChirp(w http.ResponseWriter, r *http.Request) {
 	h.res.JSON(w, http.StatusOK, toChirpDTO(chirp))
 }
 
-func (h *HandlerChirps) DeleteChirp() http.Handler {
-	return auth.WithAuth(h.cfg, h.logger, http.HandlerFunc(h.deleteChirp))
-}
-
-func (h *HandlerChirps) deleteChirp(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerChirps) DeleteChirp(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		h.res.JSONError(w, http.StatusBadRequest,

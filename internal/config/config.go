@@ -21,15 +21,17 @@ func getEnv() EnvVars {
 }
 
 type Config struct {
-	Env   EnvVars
-	IsDev bool
+	Env    EnvVars
+	IsDev  bool
+	FsRoot string
 }
 
 func Load() *Config {
 	env := getEnv()
 
 	return &Config{
-		Env:   env,
-		IsDev: env.Platform == "dev",
+		Env:    env,
+		IsDev:  env.Platform == "dev",
+		FsRoot: "public",
 	}
 }
