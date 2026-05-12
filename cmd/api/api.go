@@ -1,11 +1,8 @@
 package main
 
 import (
+	"chirpy/internal/app"
 	"chirpy/internal/config"
-	"chirpy/internal/database"
-	"chirpy/internal/handlers"
-	"chirpy/internal/metrics"
-	"chirpy/internal/server"
 	"database/sql"
 	"log"
 	"net/http"
@@ -22,33 +19,12 @@ func newDB(dbUrl string) *sql.DB {
 	return dbConn
 }
 
-func buildApp(
-	cfg *config.Config,
-	dbConn *sql.DB,
-) *http.ServeMux {
-	db := database.New(dbConn)
-
-	metrics := metrics.New()
-
-	handlerAdmin := handlers.NewHandlerAdmin(cfg, db, metrics)
-	handlerUsers := handlers.NewHandlerUsers(cfg, db)
-	handlerChirps := handlers.NewHandlerChirps(cfg, db)
-	handlerApp := handlers.NewHandlerApp(metrics)
-
-	return server.New(server.Deps{
-		HandlerAdmin:  handlerAdmin,
-		HandlerUsers:  handlerUsers,
-		HandlerChirps: handlerChirps,
-		HandlerApp:    handlerApp,
-	})
-}
-
 func main() {
 	godotenv.Load()
 	cfg := config.Load()
 	dbConn := newDB(cfg.Env.DBUrl)
 
-	app := buildApp(cfg, dbConn)
+	app := app.BuildApp(cfg, dbConn)
 
 	log.Fatal(http.ListenAndServe(":8080", app))
 }
