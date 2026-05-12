@@ -16,5 +16,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/chirps/{id}", s.handlerChirps.GetChirp)
 	s.mux.Handle("DELETE /api/chirps/{id}", s.handlerChirps.DeleteChirp())
 
+	s.mux.HandleFunc("POST /api/polka/webhooks", s.handlerUsers.WebhookUpgradeUser)
+
 	s.mux.Handle("/app/", s.handlerApp.ServeAppFiles("/app/"))
 }

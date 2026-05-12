@@ -32,18 +32,20 @@ func NewHandlerUsers(cfg *config.Config, db *database.Queries) *HandlerUsers {
 }
 
 type userDTO struct {
-	Id        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
+	Id          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Email       string    `json:"email"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
 }
 
 func toUserDTO(user database.User) userDTO {
 	return userDTO{
-		Id:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+		Id:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	}
 }
 
@@ -224,6 +226,45 @@ func (h *HandlerUsers) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		u.SendJSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Error marking token revoked: %s", err))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *HandlerUsers) WebhookUpgradeUser(w http.ResponseWriter, r *http.Request) {
+	reqBody := struct {
+		Event string `json:"event"`
+		Data  struct {
+			UserId string `json:"user_id"`
+		} `json:"data"`
+	}{}
+
+	if err := u.DecodeJSON(r, &reqBody); err != nil {
+		u.SendJSONError(w, http.StatusBadRequest,
+			fmt.Sprintf("invalid request body: %v", err))
+		return
+	}
+
+	if reqBody.Event != "user.upgraded" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	userId, err := uuid.Parse(reqBody.Data.UserId)
+	if err != nil {
+		u.SendJSONError(w, http.StatusBadRequest,
+			fmt.Sprintf("invalid user ID: %v", err))
+		return
+	}
+
+	_, err = h.db.SetUserChirpyRedStatus(r.Context(), database.SetUserChirpyRedStatusParams{
+		ID:          userId,
+		IsChirpyRed: true,
+	})
+	if err != nil {
+		u.SendJSONError(w, http.StatusNotFound,
+			fmt.Sprintf("user not found: %v", err))
 		return
 	}
 

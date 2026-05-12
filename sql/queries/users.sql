@@ -23,3 +23,11 @@ SELECT * FROM users WHERE email = $1;
 
 -- name: ResetUsers :exec
 TRUNCATE TABLE users CASCADE;
+
+-- name: SetUserChirpyRedStatus :one
+UPDATE users
+SET
+    updated_at = now(),
+    is_chirpy_red = $2
+WHERE id = $1
+RETURNING *;
