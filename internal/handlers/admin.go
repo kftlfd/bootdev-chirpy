@@ -3,6 +3,7 @@ package handlers
 import (
 	"chirpy/internal/config"
 	"chirpy/internal/database"
+	"chirpy/internal/metrics"
 	u "chirpy/internal/utils"
 	"fmt"
 	"log"
@@ -10,21 +11,26 @@ import (
 )
 
 type HandlerAdmin struct {
-	cfg *config.Config
-	db  *database.Queries
+	cfg     *config.Config
+	db      *database.Queries
+	metrics *metrics.Metrics
 }
 
-func NewHandlerAdmin(cfg *config.Config, db *database.Queries) *HandlerAdmin {
+func NewHandlerAdmin(cfg *config.Config, db *database.Queries, m *metrics.Metrics) *HandlerAdmin {
 	if cfg == nil {
 		panic("cfg is nil")
 	}
 	if db == nil {
 		panic("db is nil")
 	}
+	if m == nil {
+		panic("metrics is nil")
+	}
 
 	return &HandlerAdmin{
-		cfg: cfg,
-		db:  db,
+		cfg:     cfg,
+		db:      db,
+		metrics: m,
 	}
 }
 
@@ -48,14 +54,14 @@ func getMetricsHtml(visits int32) string {
 func (h *HandlerAdmin) MetricsHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	html := getMetricsHtml(h.cfg.FileserverHits.Load())
+	html := getMetricsHtml(h.metrics.FileserverHits.Load())
 	if _, err := w.Write([]byte(html)); err != nil {
 		log.Printf("write: %v", err)
 	}
 }
 
 func (h *HandlerAdmin) ResetMetricsHandler(w http.ResponseWriter, r *http.Request) {
-	if !h.cfg.Env.IsDev {
+	if !h.cfg.IsDev {
 		u.SendJSONError(w, http.StatusForbidden, "unsafe operation")
 		return
 	}
@@ -67,6 +73,6 @@ func (h *HandlerAdmin) ResetMetricsHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	h.cfg.FileserverHits.Store(0)
+	h.metrics.FileserverHits.Store(0)
 	u.SendJSON(w, http.StatusOK, "OK")
 }

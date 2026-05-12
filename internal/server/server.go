@@ -20,7 +20,7 @@ type Deps struct {
 	HandlerApp    *handlers.HandlerApp
 }
 
-func New(deps Deps) *Server {
+func New(deps Deps) *http.ServeMux {
 	if deps.HandlerAdmin == nil {
 		panic("admin handler is nil")
 	}
@@ -44,10 +44,5 @@ func New(deps Deps) *Server {
 
 	s.registerRoutes()
 
-	return s
-
-}
-
-func (s *Server) Run() error {
-	return http.ListenAndServe(":8080", s.mux)
+	return s.mux
 }

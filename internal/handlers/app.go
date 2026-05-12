@@ -1,27 +1,27 @@
 package handlers
 
 import (
-	"chirpy/internal/config"
+	"chirpy/internal/metrics"
 	"net/http"
 )
 
 type HandlerApp struct {
-	cfg *config.Config
+	metrics *metrics.Metrics
 }
 
-func NewHandlerApp(cfg *config.Config) *HandlerApp {
-	if cfg == nil {
-		panic("cfg is nil")
+func NewHandlerApp(m *metrics.Metrics) *HandlerApp {
+	if m == nil {
+		panic("metrics is nil")
 	}
 
 	return &HandlerApp{
-		cfg: cfg,
+		metrics: m,
 	}
 }
 
 func (h *HandlerApp) middlewareMetricsInc(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h.cfg.FileserverHits.Add(1)
+		h.metrics.FileserverHits.Add(1)
 		next.ServeHTTP(w, r)
 	})
 }
