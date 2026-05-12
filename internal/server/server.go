@@ -2,11 +2,13 @@ package server
 
 import (
 	"chirpy/internal/handlers"
+	"log/slog"
 	"net/http"
 )
 
 type Server struct {
 	mux           *http.ServeMux
+	logger        *slog.Logger
 	handlerAdmin  *handlers.HandlerAdmin
 	handlerUsers  *handlers.HandlerUsers
 	handlerChirps *handlers.HandlerChirps
@@ -14,13 +16,17 @@ type Server struct {
 }
 
 type Deps struct {
+	Logger        *slog.Logger
 	HandlerAdmin  *handlers.HandlerAdmin
 	HandlerUsers  *handlers.HandlerUsers
 	HandlerChirps *handlers.HandlerChirps
 	HandlerApp    *handlers.HandlerApp
 }
 
-func New(deps Deps) *http.ServeMux {
+func New(deps Deps) http.Handler {
+	if deps.Logger == nil {
+		panic("logger is nil")
+	}
 	if deps.HandlerAdmin == nil {
 		panic("admin handler is nil")
 	}
@@ -36,6 +42,7 @@ func New(deps Deps) *http.ServeMux {
 
 	s := &Server{
 		mux:           http.NewServeMux(),
+		logger:        deps.Logger,
 		handlerAdmin:  deps.HandlerAdmin,
 		handlerUsers:  deps.HandlerUsers,
 		handlerChirps: deps.HandlerChirps,

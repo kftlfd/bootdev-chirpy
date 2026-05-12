@@ -3,10 +3,10 @@ package handlers
 import (
 	"chirpy/internal/config"
 	"chirpy/internal/database"
+	"chirpy/internal/httpx"
 	"chirpy/internal/metrics"
-	u "chirpy/internal/utils"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -14,9 +14,13 @@ type HandlerAdmin struct {
 	cfg     *config.Config
 	db      *database.Queries
 	metrics *metrics.Metrics
+	res     *httpx.Responder
 }
 
-func NewHandlerAdmin(cfg *config.Config, db *database.Queries, m *metrics.Metrics) *HandlerAdmin {
+func NewHandlerAdmin(cfg *config.Config, logger *slog.Logger, db *database.Queries, m *metrics.Metrics) *HandlerAdmin {
+	if logger == nil {
+		panic("logger is nil")
+	}
 	if cfg == nil {
 		panic("cfg is nil")
 	}
@@ -27,19 +31,18 @@ func NewHandlerAdmin(cfg *config.Config, db *database.Queries, m *metrics.Metric
 		panic("metrics is nil")
 	}
 
+	log := logger.With("module", "handler-admin")
+
 	return &HandlerAdmin{
 		cfg:     cfg,
 		db:      db,
 		metrics: m,
+		res:     httpx.NewResponder(log),
 	}
 }
 
 func (h *HandlerAdmin) HandleHealth(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	if _, err := w.Write([]byte("OK")); err != nil {
-		log.Printf("write: %v", err)
-	}
+	h.res.Text(w, http.StatusOK, []byte("OK"))
 }
 
 func getMetricsHtml(visits int32) string {
@@ -52,27 +55,23 @@ func getMetricsHtml(visits int32) string {
 }
 
 func (h *HandlerAdmin) MetricsHandler(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	html := getMetricsHtml(h.metrics.FileserverHits.Load())
-	if _, err := w.Write([]byte(html)); err != nil {
-		log.Printf("write: %v", err)
-	}
+	h.res.HTML(w, http.StatusOK, []byte(html))
 }
 
 func (h *HandlerAdmin) ResetMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	if !h.cfg.IsDev {
-		u.SendJSONError(w, http.StatusForbidden, "unsafe operation")
+		h.res.JSONError(w, http.StatusForbidden, "unsafe operation")
 		return
 	}
 
 	err := h.db.ResetUsers(r.Context())
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("reset users error: %s", err))
 		return
 	}
 
 	h.metrics.FileserverHits.Store(0)
-	u.SendJSON(w, http.StatusOK, "OK")
+	h.res.JSON(w, http.StatusOK, "OK")
 }

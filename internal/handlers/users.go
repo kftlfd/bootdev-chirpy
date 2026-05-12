@@ -4,8 +4,9 @@ import (
 	"chirpy/internal/auth"
 	"chirpy/internal/config"
 	"chirpy/internal/database"
-	u "chirpy/internal/utils"
+	"chirpy/internal/httpx"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -13,11 +14,16 @@ import (
 )
 
 type HandlerUsers struct {
-	cfg *config.Config
-	db  *database.Queries
+	cfg    *config.Config
+	logger *slog.Logger
+	db     *database.Queries
+	res    *httpx.Responder
 }
 
-func NewHandlerUsers(cfg *config.Config, db *database.Queries) *HandlerUsers {
+func NewHandlerUsers(cfg *config.Config, logger *slog.Logger, db *database.Queries) *HandlerUsers {
+	if logger == nil {
+		panic("logger is nil")
+	}
 	if cfg == nil {
 		panic("cfg is nil")
 	}
@@ -25,9 +31,13 @@ func NewHandlerUsers(cfg *config.Config, db *database.Queries) *HandlerUsers {
 		panic("db is nill")
 	}
 
+	log := logger.With("module", "handler-users")
+
 	return &HandlerUsers{
-		cfg: cfg,
-		db:  db,
+		cfg:    cfg,
+		logger: log,
+		db:     db,
+		res:    httpx.NewResponder(log),
 	}
 }
 
@@ -69,20 +79,20 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}{}
 
-	if err := u.DecodeJSON(r, &reqBody); err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Error decoding parameters: %s", err))
 		return
 	}
 
 	if reqBody.Email == "" || reqBody.Password == "" {
-		u.SendJSONError(w, http.StatusBadRequest, "Invalid email/password")
+		h.res.JSONError(w, http.StatusBadRequest, "Invalid email/password")
 		return
 	}
 
 	passwordHash, err := auth.HashPassword(reqBody.Password)
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error creating password hash: %s", err))
 		return
 	}
@@ -92,16 +102,16 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		HashedPassword: passwordHash,
 	})
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error creating user: %s", err))
 		return
 	}
 
-	u.SendJSON(w, http.StatusCreated, toUserDTO(user))
+	h.res.JSON(w, http.StatusCreated, toUserDTO(user))
 }
 
 func (h *HandlerUsers) UpdateUser() http.Handler {
-	return auth.WithAuth(h.cfg, http.HandlerFunc(h.updateUser))
+	return auth.WithAuth(h.cfg, h.logger, http.HandlerFunc(h.updateUser))
 }
 
 func (h *HandlerUsers) updateUser(w http.ResponseWriter, r *http.Request) {
@@ -110,15 +120,15 @@ func (h *HandlerUsers) updateUser(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}{}
 
-	if err := u.DecodeJSON(r, &reqBody); err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Invalid request body: %s", err))
 		return
 	}
 
 	newHash, err := auth.HashPassword(reqBody.Password)
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error hashing password: %s", err))
 		return
 	}
@@ -131,12 +141,12 @@ func (h *HandlerUsers) updateUser(w http.ResponseWriter, r *http.Request) {
 		HashedPassword: newHash,
 	})
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error updating user: %s", err))
 		return
 	}
 
-	u.SendJSON(w, http.StatusOK, toUserDTO(user))
+	h.res.JSON(w, http.StatusOK, toUserDTO(user))
 }
 
 func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
@@ -145,33 +155,33 @@ func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}{}
 
-	if err := u.DecodeJSON(r, &reqBody); err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Error decoding params: %s", err))
 		return
 	}
 
 	user, err := h.db.GetUserByEmail(r.Context(), reqBody.Email)
 	if err != nil {
-		u.SendJSONError(w, http.StatusNotFound,
+		h.res.JSONError(w, http.StatusNotFound,
 			fmt.Sprintf("Error getting user: %s", err))
 		return
 	}
 
 	passwordOk, err := auth.CheckPasswordHash(reqBody.Password, user.HashedPassword)
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error creating password hash: %s", err))
 		return
 	}
 	if !passwordOk {
-		u.SendJSONError(w, http.StatusUnauthorized, "Invalid password")
+		h.res.JSONError(w, http.StatusUnauthorized, "Invalid password")
 		return
 	}
 
 	token, err := auth.MakeJWT(user.ID, h.cfg.Env.ServerSecret, time.Hour)
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error creating jwt: %s", err))
 		return
 	}
@@ -182,39 +192,39 @@ func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
 	})
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error creating refresh token: %s", err))
 		return
 	}
 
 	respBody := toUserWithTokensDTO(user, token, refreshToken.Token)
 
-	u.SendJSON(w, http.StatusOK, respBody)
+	h.res.JSON(w, http.StatusOK, respBody)
 }
 
 func (h *HandlerUsers) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	rToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		u.SendJSONError(w, http.StatusUnauthorized,
+		h.res.JSONError(w, http.StatusUnauthorized,
 			fmt.Sprintf("Error getting auth token: %s", err))
 		return
 	}
 
 	token, err := h.db.GetRefreshToken(r.Context(), rToken)
 	if err != nil {
-		u.SendJSONError(w, http.StatusUnauthorized,
+		h.res.JSONError(w, http.StatusUnauthorized,
 			fmt.Sprintf("Error getting refresh token from DB: %s", err))
 		return
 	}
 
 	jwt, err := auth.MakeJWT(token.UserID, h.cfg.Env.ServerSecret, time.Hour)
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error creating jwt: %s", err))
 		return
 	}
 
-	u.SendJSON(w, http.StatusOK, u.D{
+	h.res.JSON(w, http.StatusOK, httpx.D{
 		"token": jwt,
 	})
 }
@@ -222,14 +232,14 @@ func (h *HandlerUsers) RefreshToken(w http.ResponseWriter, r *http.Request) {
 func (h *HandlerUsers) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	rToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Error getting auth token: %s", err))
 		return
 	}
 
 	err = h.db.MarkTokenRevoked(r.Context(), rToken)
 	if err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Error marking token revoked: %s", err))
 		return
 	}
@@ -240,7 +250,7 @@ func (h *HandlerUsers) RevokeToken(w http.ResponseWriter, r *http.Request) {
 func (h *HandlerUsers) WebhookUpgradeUser(w http.ResponseWriter, r *http.Request) {
 	apiKey, err := auth.GetAPIKey(r.Header)
 	if err != nil || apiKey != h.cfg.Env.PolkaKey {
-		u.SendJSONError(w, http.StatusUnauthorized, "Invalid API key")
+		h.res.JSONError(w, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
 
@@ -251,8 +261,8 @@ func (h *HandlerUsers) WebhookUpgradeUser(w http.ResponseWriter, r *http.Request
 		} `json:"data"`
 	}{}
 
-	if err := u.DecodeJSON(r, &reqBody); err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("invalid request body: %v", err))
 		return
 	}
@@ -264,7 +274,7 @@ func (h *HandlerUsers) WebhookUpgradeUser(w http.ResponseWriter, r *http.Request
 
 	userId, err := uuid.Parse(reqBody.Data.UserId)
 	if err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("invalid user ID: %v", err))
 		return
 	}
@@ -274,7 +284,7 @@ func (h *HandlerUsers) WebhookUpgradeUser(w http.ResponseWriter, r *http.Request
 		IsChirpyRed: true,
 	})
 	if err != nil {
-		u.SendJSONError(w, http.StatusNotFound,
+		h.res.JSONError(w, http.StatusNotFound,
 			fmt.Sprintf("user not found: %v", err))
 		return
 	}

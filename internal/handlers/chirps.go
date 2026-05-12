@@ -4,8 +4,9 @@ import (
 	"chirpy/internal/auth"
 	"chirpy/internal/config"
 	"chirpy/internal/database"
-	u "chirpy/internal/utils"
+	"chirpy/internal/httpx"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -15,11 +16,16 @@ import (
 )
 
 type HandlerChirps struct {
-	cfg *config.Config
-	db  *database.Queries
+	cfg    *config.Config
+	logger *slog.Logger
+	db     *database.Queries
+	res    *httpx.Responder
 }
 
-func NewHandlerChirps(cfg *config.Config, db *database.Queries) *HandlerChirps {
+func NewHandlerChirps(cfg *config.Config, logger *slog.Logger, db *database.Queries) *HandlerChirps {
+	if logger == nil {
+		panic("logger is nil")
+	}
 	if cfg == nil {
 		panic("cfg is nil")
 	}
@@ -27,9 +33,13 @@ func NewHandlerChirps(cfg *config.Config, db *database.Queries) *HandlerChirps {
 		panic("db is nill")
 	}
 
+	log := logger.With("module", "handler-chirps")
+
 	return &HandlerChirps{
-		cfg: cfg,
-		db:  db,
+		cfg:    cfg,
+		logger: log,
+		db:     db,
+		res:    httpx.NewResponder(log),
 	}
 }
 
@@ -78,7 +88,7 @@ func censorChirp(chirp string) string {
 }
 
 func (h *HandlerChirps) CreateChirp() http.Handler {
-	return auth.WithAuth(h.cfg, http.HandlerFunc(h.createChirp))
+	return auth.WithAuth(h.cfg, h.logger, http.HandlerFunc(h.createChirp))
 }
 
 func (h *HandlerChirps) createChirp(w http.ResponseWriter, r *http.Request) {
@@ -87,14 +97,14 @@ func (h *HandlerChirps) createChirp(w http.ResponseWriter, r *http.Request) {
 		UserId uuid.UUID `json:"user_id"`
 	}{}
 
-	if err := u.DecodeJSON(r, &reqBody); err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Error decoding parameters: %s", err))
 		return
 	}
 
 	if len(reqBody.Body) > 140 {
-		u.SendJSONError(w, http.StatusBadRequest, "Chirp is too long")
+		h.res.JSONError(w, http.StatusBadRequest, "Chirp is too long")
 		return
 	}
 
@@ -105,12 +115,12 @@ func (h *HandlerChirps) createChirp(w http.ResponseWriter, r *http.Request) {
 		UserID: userId,
 	})
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error creating chirp: %s", err))
 		return
 	}
 
-	u.SendJSON(w, http.StatusCreated, toChirpDTO(chirp))
+	h.res.JSON(w, http.StatusCreated, toChirpDTO(chirp))
 }
 
 func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +132,7 @@ func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
 	if len(authorId) > 0 {
 		userId, err := uuid.Parse(authorId)
 		if err != nil {
-			u.SendJSONError(w, http.StatusBadRequest,
+			h.res.JSONError(w, http.StatusBadRequest,
 				fmt.Sprintf("invalid author ID: %v", err))
 			return
 		}
@@ -132,7 +142,7 @@ func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
 
 	chirps, err := h.db.GetAllChirps(r.Context(), filter)
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error getting chirps: %s", err))
 		return
 	}
@@ -148,42 +158,42 @@ func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
 		dtos[i] = toChirpDTO(chirp)
 	}
 
-	u.SendJSON(w, http.StatusOK, dtos)
+	h.res.JSON(w, http.StatusOK, dtos)
 }
 
 func (h *HandlerChirps) GetChirp(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Invalid ID: %s", err))
 		return
 	}
 
 	chirp, err := h.db.GetChirpById(r.Context(), id)
 	if err != nil {
-		u.SendJSONError(w, http.StatusNotFound,
+		h.res.JSONError(w, http.StatusNotFound,
 			fmt.Sprintf("Error getting chirp: %s", err))
 		return
 	}
 
-	u.SendJSON(w, http.StatusOK, toChirpDTO(chirp))
+	h.res.JSON(w, http.StatusOK, toChirpDTO(chirp))
 }
 
 func (h *HandlerChirps) DeleteChirp() http.Handler {
-	return auth.WithAuth(h.cfg, http.HandlerFunc(h.deleteChirp))
+	return auth.WithAuth(h.cfg, h.logger, http.HandlerFunc(h.deleteChirp))
 }
 
 func (h *HandlerChirps) deleteChirp(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		u.SendJSONError(w, http.StatusBadRequest,
+		h.res.JSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Invalid url id: %s", err))
 		return
 	}
 
 	chirp, err := h.db.GetChirpById(r.Context(), id)
 	if err != nil {
-		u.SendJSONError(w, http.StatusNotFound,
+		h.res.JSONError(w, http.StatusNotFound,
 			fmt.Sprintf("not found: %s", err))
 		return
 	}
@@ -191,7 +201,7 @@ func (h *HandlerChirps) deleteChirp(w http.ResponseWriter, r *http.Request) {
 	userId := auth.RequireAuthUser(r.Context())
 
 	if chirp.UserID != userId {
-		u.SendJSONError(w, http.StatusForbidden, "can delete only your own chirps")
+		h.res.JSONError(w, http.StatusForbidden, "can delete only your own chirps")
 		return
 	}
 
@@ -200,7 +210,7 @@ func (h *HandlerChirps) deleteChirp(w http.ResponseWriter, r *http.Request) {
 		ID:     id,
 	})
 	if err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		h.res.JSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error deleting chirp: %s", err))
 		return
 	}

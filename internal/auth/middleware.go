@@ -2,9 +2,10 @@ package auth
 
 import (
 	"chirpy/internal/config"
-	u "chirpy/internal/utils"
+	"chirpy/internal/httpx"
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -14,11 +15,14 @@ type contextKey string
 
 const authUserKey contextKey = "auth_user"
 
-func WithAuth(cfg *config.Config, next http.Handler) http.Handler {
+func WithAuth(cfg *config.Config, logger *slog.Logger, next http.Handler) http.Handler {
+	log := logger.With("module", "middleware-with-auth")
+	res := httpx.NewResponder(log)
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := GetBearerToken(r.Header)
 		if err != nil {
-			u.SendJSON(w, http.StatusUnauthorized, u.D{
+			res.JSON(w, http.StatusUnauthorized, httpx.D{
 				"error": fmt.Sprintf("No auth token: %s", err),
 			})
 			return
@@ -26,7 +30,7 @@ func WithAuth(cfg *config.Config, next http.Handler) http.Handler {
 
 		userId, err := ValidateJWT(token, cfg.Env.ServerSecret)
 		if err != nil {
-			u.SendJSON(w, http.StatusUnauthorized, u.D{
+			res.JSON(w, http.StatusUnauthorized, httpx.D{
 				"error": fmt.Sprintf("Invalid token: %s", err),
 			})
 			return
