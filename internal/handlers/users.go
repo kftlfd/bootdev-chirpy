@@ -70,8 +70,13 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}{}
 
 	if err := u.DecodeJSON(r, &reqBody); err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		u.SendJSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Error decoding parameters: %s", err))
+		return
+	}
+
+	if reqBody.Email == "" || reqBody.Password == "" {
+		u.SendJSONError(w, http.StatusBadRequest, "Invalid email/password")
 		return
 	}
 
@@ -141,7 +146,7 @@ func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
 	}{}
 
 	if err := u.DecodeJSON(r, &reqBody); err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		u.SendJSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Error decoding params: %s", err))
 		return
 	}

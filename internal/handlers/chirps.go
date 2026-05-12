@@ -88,7 +88,7 @@ func (h *HandlerChirps) createChirp(w http.ResponseWriter, r *http.Request) {
 	}{}
 
 	if err := u.DecodeJSON(r, &reqBody); err != nil {
-		u.SendJSONError(w, http.StatusInternalServerError,
+		u.SendJSONError(w, http.StatusBadRequest,
 			fmt.Sprintf("Error decoding parameters: %s", err))
 		return
 	}
