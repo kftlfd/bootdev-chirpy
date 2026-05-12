@@ -233,6 +233,12 @@ func (h *HandlerUsers) RevokeToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HandlerUsers) WebhookUpgradeUser(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil || apiKey != h.cfg.Env.PolkaKey {
+		u.SendJSONError(w, http.StatusUnauthorized, "Invalid API key")
+		return
+	}
+
 	reqBody := struct {
 		Event string `json:"event"`
 		Data  struct {

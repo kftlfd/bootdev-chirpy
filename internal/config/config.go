@@ -9,6 +9,7 @@ type EnvVars struct {
 	IsDev        bool
 	ServerSecret string
 	DBUrl        string
+	PolkaKey     string
 }
 
 type Config struct {
@@ -21,6 +22,7 @@ func Load() *Config {
 		IsDev:        os.Getenv("PLATFORM") == "dev",
 		ServerSecret: os.Getenv("SERVER_SECRET"),
 		DBUrl:        os.Getenv("DB_URL"),
+		PolkaKey:     os.Getenv("POLKA_KEY"),
 	}
 
 	cfg := &Config{

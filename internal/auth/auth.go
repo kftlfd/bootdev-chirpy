@@ -16,14 +16,22 @@ func CheckPasswordHash(password, hash string) (bool, error) {
 	return argon2id.ComparePasswordAndHash(password, hash)
 }
 
-func GetBearerToken(header http.Header) (string, error) {
+func getAuthToken(header http.Header, format string) (string, error) {
 	t := header.Get("Authorization")
 
-	fields := strings.Split(t, " ")
+	fields := strings.Fields(t)
 
-	if len(fields) != 2 || fields[0] != "Bearer" {
+	if len(fields) != 2 || fields[0] != format {
 		return "", errors.New("invalid format")
 	}
 
 	return fields[1], nil
+}
+
+func GetBearerToken(header http.Header) (string, error) {
+	return getAuthToken(header, "Bearer")
+}
+
+func GetAPIKey(header http.Header) (string, error) {
+	return getAuthToken(header, "ApiKey")
 }
