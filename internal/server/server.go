@@ -1,6 +1,7 @@
 package server
 
 import (
+	"chirpy/internal/config"
 	"chirpy/internal/handlers"
 	"log/slog"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 
 type Server struct {
 	mux           *http.ServeMux
+	cfg           *config.Config
 	logger        *slog.Logger
 	handlerAdmin  *handlers.HandlerAdmin
 	handlerUsers  *handlers.HandlerUsers
@@ -16,6 +18,7 @@ type Server struct {
 }
 
 type Deps struct {
+	Config        *config.Config
 	Logger        *slog.Logger
 	HandlerAdmin  *handlers.HandlerAdmin
 	HandlerUsers  *handlers.HandlerUsers
@@ -24,6 +27,9 @@ type Deps struct {
 }
 
 func New(deps Deps) http.Handler {
+	if deps.Config == nil {
+		panic("config is nil")
+	}
 	if deps.Logger == nil {
 		panic("logger is nil")
 	}
@@ -42,6 +48,7 @@ func New(deps Deps) http.Handler {
 
 	s := &Server{
 		mux:           http.NewServeMux(),
+		cfg:           deps.Config,
 		logger:        deps.Logger,
 		handlerAdmin:  deps.HandlerAdmin,
 		handlerUsers:  deps.HandlerUsers,
@@ -51,5 +58,5 @@ func New(deps Deps) http.Handler {
 
 	s.registerRoutes()
 
-	return s.withMiddleware()
+	return s.getHandler()
 }
