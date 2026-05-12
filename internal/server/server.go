@@ -51,5 +51,5 @@ func New(deps Deps) http.Handler {
 
 	s.registerRoutes()
 
-	return s.mux
+	return s.withMiddleware()
 }
