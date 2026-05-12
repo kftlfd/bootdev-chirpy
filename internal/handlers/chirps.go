@@ -7,6 +7,7 @@ import (
 	u "chirpy/internal/utils"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -113,9 +114,11 @@ func (h *HandlerChirps) createChirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
+	authorId := r.URL.Query().Get("author_id")
+	sortOrd := r.URL.Query().Get("sort")
+
 	filter := database.GetAllChirpsParams{}
 
-	authorId := r.URL.Query().Get("author_id")
 	if len(authorId) > 0 {
 		userId, err := uuid.Parse(authorId)
 		if err != nil {
@@ -132,6 +135,12 @@ func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
 		u.SendJSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error getting chirps: %s", err))
 		return
+	}
+
+	if sortOrd == "desc" {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		})
 	}
 
 	dtos := make([]chirpDto, len(chirps))
