@@ -113,7 +113,21 @@ func (h *HandlerChirps) createChirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, err := h.db.GetAllChirps(r.Context())
+	filter := database.GetAllChirpsParams{}
+
+	authorId := r.URL.Query().Get("author_id")
+	if len(authorId) > 0 {
+		userId, err := uuid.Parse(authorId)
+		if err != nil {
+			u.SendJSONError(w, http.StatusBadRequest,
+				fmt.Sprintf("invalid author ID: %v", err))
+			return
+		}
+		filter.HasUserID = true
+		filter.UserID = userId
+	}
+
+	chirps, err := h.db.GetAllChirps(r.Context(), filter)
 	if err != nil {
 		u.SendJSONError(w, http.StatusInternalServerError,
 			fmt.Sprintf("Error getting chirps: %s", err))

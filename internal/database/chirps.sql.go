@@ -56,11 +56,20 @@ func (q *Queries) DeleteChirp(ctx context.Context, arg DeleteChirpParams) error 
 }
 
 const getAllChirps = `-- name: GetAllChirps :many
-SELECT id, created_at, updated_at, body, user_id FROM chirps ORDER BY created_at ASC
+SELECT id, created_at, updated_at, body, user_id FROM chirps
+WHERE id IS NOT NULL
+AND (NOT $2::boolean OR user_id = $1)
+ORDER BY created_at ASC
 `
 
-func (q *Queries) GetAllChirps(ctx context.Context) ([]Chirp, error) {
-	rows, err := q.db.QueryContext(ctx, getAllChirps)
+type GetAllChirpsParams struct {
+	UserID    uuid.UUID
+	HasUserID bool
+}
+
+// sqlc dynamic queries workaround: https://dizzy.zone/2024/07/03/SQLC-dynamic-queries/
+func (q *Queries) GetAllChirps(ctx context.Context, arg GetAllChirpsParams) ([]Chirp, error) {
+	rows, err := q.db.QueryContext(ctx, getAllChirps, arg.UserID, arg.HasUserID)
 	if err != nil {
 		return nil, err
 	}
