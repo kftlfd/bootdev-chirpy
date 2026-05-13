@@ -11,7 +11,7 @@ COPY cmd cmd
 COPY docs docs
 COPY internal internal
 
-RUN go build -o chirpy ./cmd/api
+RUN go build ./cmd/chirpy
 
 # === final
 

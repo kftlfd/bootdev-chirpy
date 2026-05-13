@@ -34,10 +34,10 @@ goose postgres $DB up
 
 ```sh
 # dev move
-go run ./cmd/api
+go run ./cmd/chirpy
 
 # build
-go build -o chirpy ./cmd/api
+go build ./cmd/chirpy
 ./chirpy
 ```
 
