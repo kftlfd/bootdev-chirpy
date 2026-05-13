@@ -6,6 +6,8 @@ import (
 
 type EnvVars struct {
 	Platform     string
+	Host         string
+	Port         string
 	ServerSecret string
 	DBUrl        string
 	PolkaKey     string
@@ -14,6 +16,8 @@ type EnvVars struct {
 func getEnv() EnvVars {
 	return EnvVars{
 		Platform:     os.Getenv("PLATFORM"),
+		Host:         os.Getenv("HOST"),
+		Port:         os.Getenv("PORT"),
 		ServerSecret: os.Getenv("SERVER_SECRET"),
 		DBUrl:        os.Getenv("DB_URL"),
 		PolkaKey:     os.Getenv("POLKA_KEY"),

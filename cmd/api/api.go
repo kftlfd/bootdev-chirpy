@@ -46,5 +46,13 @@ func main() {
 
 	app := app.BuildApp(cfg, dbConn)
 
-	log.Fatal(http.ListenAndServe(":8080", app))
+	host := cfg.Env.Host
+	port := cfg.Env.Port
+	if port == "" {
+		port = "8080"
+	}
+	addr := host + ":" + port
+	log.Print("Listening on " + addr)
+
+	log.Fatal(http.ListenAndServe(addr, app))
 }
