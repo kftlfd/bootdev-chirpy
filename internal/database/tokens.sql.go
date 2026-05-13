@@ -60,15 +60,25 @@ func (q *Queries) GetRefreshToken(ctx context.Context, token string) (RefreshTok
 	return i, err
 }
 
-const markTokenRevoked = `-- name: MarkTokenRevoked :exec
+const markTokenRevoked = `-- name: MarkTokenRevoked :one
 UPDATE refresh_tokens
 SET
     updated_at = now(),
     revoked_at = now()
 WHERE token = $1
+RETURNING token, created_at, updated_at, user_id, expires_at, revoked_at
 `
 
-func (q *Queries) MarkTokenRevoked(ctx context.Context, token string) error {
-	_, err := q.db.ExecContext(ctx, markTokenRevoked, token)
-	return err
+func (q *Queries) MarkTokenRevoked(ctx context.Context, token string) (RefreshToken, error) {
+	row := q.db.QueryRowContext(ctx, markTokenRevoked, token)
+	var i RefreshToken
+	err := row.Scan(
+		&i.Token,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.UserID,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+	)
+	return i, err
 }

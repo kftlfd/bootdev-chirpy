@@ -10,9 +10,10 @@ WHERE
     AND expires_at > now()
     AND token = $1;
 
--- name: MarkTokenRevoked :exec
+-- name: MarkTokenRevoked :one
 UPDATE refresh_tokens
 SET
     updated_at = now(),
     revoked_at = now()
-WHERE token = $1;
+WHERE token = $1
+RETURNING *;

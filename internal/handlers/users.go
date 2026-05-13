@@ -107,8 +107,15 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		HashedPassword: passwordHash,
 	})
 	if err != nil {
-		h.res.JSONError(w, http.StatusInternalServerError,
-			fmt.Sprintf("Error creating user: %s", err))
+		switch {
+		case database.IsConstraintViolationError(err):
+			h.res.JSONError(w, http.StatusBadRequest,
+				fmt.Sprintf("Invalid input: %s", err))
+
+		default:
+			h.res.JSONError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Error creating user: %s", err))
+		}
 		return
 	}
 
@@ -145,8 +152,15 @@ func (h *HandlerUsers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		HashedPassword: newHash,
 	})
 	if err != nil {
-		h.res.JSONError(w, http.StatusInternalServerError,
-			fmt.Sprintf("Error updating user: %s", err))
+		switch {
+		case database.IsNotFoundError(err):
+			h.res.JSONError(w, http.StatusNotFound,
+				fmt.Sprintf("not found: %s", err))
+
+		default:
+			h.res.JSONError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Error updating user: %s", err))
+		}
 		return
 	}
 
@@ -169,8 +183,15 @@ func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.db.GetUserByEmail(r.Context(), reqBody.Email)
 	if err != nil {
-		h.res.JSONError(w, http.StatusNotFound,
-			fmt.Sprintf("Error getting user: %s", err))
+		switch {
+		case database.IsNotFoundError(err):
+			h.res.JSONError(w, http.StatusNotFound,
+				fmt.Sprintf("Error getting user: %s", err))
+
+		default:
+			h.res.JSONError(w, http.StatusInternalServerError,
+				fmt.Sprintf("DB error: %s", err))
+		}
 		return
 	}
 
@@ -227,8 +248,15 @@ func (h *HandlerUsers) RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.db.GetRefreshToken(r.Context(), rToken)
 	if err != nil {
-		h.res.JSONError(w, http.StatusUnauthorized,
-			fmt.Sprintf("Error getting refresh token from DB: %s", err))
+		switch {
+		case database.IsNotFoundError(err):
+			h.res.JSONError(w, http.StatusUnauthorized,
+				fmt.Sprintf("not found: %s", err))
+
+		default:
+			h.res.JSONError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Error getting refresh token from DB: %s", err))
+		}
 		return
 	}
 
@@ -255,10 +283,17 @@ func (h *HandlerUsers) RevokeToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.db.MarkTokenRevoked(r.Context(), rToken)
+	_, err = h.db.MarkTokenRevoked(r.Context(), rToken)
 	if err != nil {
-		h.res.JSONError(w, http.StatusBadRequest,
-			fmt.Sprintf("Error marking token revoked: %s", err))
+		switch {
+		case database.IsNotFoundError(err):
+			h.res.JSONError(w, http.StatusBadRequest,
+				fmt.Sprintf("invalid or expired token: %s", err))
+
+		default:
+			h.res.JSONError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Error marking token revoked: %s", err))
+		}
 		return
 	}
 
@@ -310,8 +345,15 @@ func (h *HandlerUsers) WebhookUpgradeUser(w http.ResponseWriter, r *http.Request
 		IsChirpyRed: true,
 	})
 	if err != nil {
-		h.res.JSONError(w, http.StatusNotFound,
-			fmt.Sprintf("user not found: %v", err))
+		switch {
+		case database.IsNotFoundError(err):
+			h.res.JSONError(w, http.StatusNotFound,
+				fmt.Sprintf("user not found: %v", err))
+
+		default:
+			h.res.JSONError(w, http.StatusInternalServerError,
+				fmt.Sprintf("DBError: %v", err))
+		}
 		return
 	}
 

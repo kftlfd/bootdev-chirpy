@@ -86,8 +86,7 @@ func censorChirp(chirp string) string {
 }
 
 type createChirpBody struct {
-	Body   string    `json:"body"`
-	UserId uuid.UUID `json:"user_id"`
+	Body string `json:"body"`
 }
 
 // @summary	Create chirp
@@ -117,8 +116,15 @@ func (h *HandlerChirps) CreateChirp(w http.ResponseWriter, r *http.Request) {
 		UserID: userId,
 	})
 	if err != nil {
-		h.res.JSONError(w, http.StatusInternalServerError,
-			fmt.Sprintf("Error creating chirp: %s", err))
+		switch {
+		case database.IsConstraintViolationError(err):
+			h.res.JSONError(w, http.StatusBadRequest,
+				fmt.Sprintf("Invalid input: %v", err))
+
+		default:
+			h.res.JSONError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Error creating chirp: %s", err))
+		}
 		return
 	}
 
@@ -184,8 +190,15 @@ func (h *HandlerChirps) GetChirp(w http.ResponseWriter, r *http.Request) {
 
 	chirp, err := h.db.GetChirpById(r.Context(), id)
 	if err != nil {
-		h.res.JSONError(w, http.StatusNotFound,
-			fmt.Sprintf("Error getting chirp: %s", err))
+		switch {
+		case database.IsNotFoundError(err):
+			h.res.JSONError(w, http.StatusNotFound,
+				fmt.Sprintf("Error getting chirp: %s", err))
+
+		default:
+			h.res.JSONError(w, http.StatusInternalServerError,
+				fmt.Sprintf("DB error: %v", err))
+		}
 		return
 	}
 
@@ -206,27 +219,22 @@ func (h *HandlerChirps) DeleteChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chirp, err := h.db.GetChirpById(r.Context(), id)
-	if err != nil {
-		h.res.JSONError(w, http.StatusNotFound,
-			fmt.Sprintf("not found: %s", err))
-		return
-	}
-
 	userId := auth.RequireAuthUser(r.Context())
 
-	if chirp.UserID != userId {
-		h.res.JSONError(w, http.StatusForbidden, "can delete only your own chirps")
-		return
-	}
-
-	err = h.db.DeleteChirp(r.Context(), database.DeleteChirpParams{
+	_, err = h.db.DeleteChirp(r.Context(), database.DeleteChirpParams{
 		UserID: userId,
 		ID:     id,
 	})
 	if err != nil {
-		h.res.JSONError(w, http.StatusInternalServerError,
-			fmt.Sprintf("Error deleting chirp: %s", err))
+		switch {
+		case database.IsNotFoundError(err):
+			h.res.JSONError(w, http.StatusNotFound,
+				fmt.Sprintf("not found: %s", err))
+
+		default:
+			h.res.JSONError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Error deleting chirp: %s", err))
+		}
 		return
 	}
 
