@@ -4,17 +4,15 @@ import (
 	"chirpy/internal/config"
 	"chirpy/internal/database"
 	"chirpy/internal/handlers"
-	"chirpy/internal/logging"
 	"chirpy/internal/metrics"
 	"chirpy/internal/server"
 	"database/sql"
+	"log/slog"
 	"net/http"
 )
 
-func BuildApp(cfg *config.Config, dbConn *sql.DB) http.Handler {
+func BuildApp(cfg *config.Config, dbConn *sql.DB, logger *slog.Logger) http.Handler {
 	db := database.New(dbConn)
-
-	logger := logging.NewLogger(cfg)
 
 	metrics := metrics.New()
 

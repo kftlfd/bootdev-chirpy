@@ -4,6 +4,7 @@ import (
 	"chirpy/internal/app"
 	"chirpy/internal/config"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"os"
 	"testing"
@@ -13,9 +14,15 @@ import (
 )
 
 func NewTestApp(t *testing.T) http.Handler {
+	logger := slog.New(slog.NewTextHandler(
+		os.Stdout,
+		&slog.HandlerOptions{Level: slog.LevelDebug},
+	))
+
 	return app.BuildApp(
 		Config(),
 		SetupTestDB(t),
+		logger,
 	)
 }
 
