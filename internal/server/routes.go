@@ -3,6 +3,8 @@ package server
 import (
 	"chirpy/internal/auth"
 	"net/http"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func (s *Server) protected(
@@ -50,4 +52,6 @@ func (s *Server) registerRoutes() {
 	s.mux.Handle("/api/", http.StripPrefix("/api", api))
 
 	s.mux.Handle("/app/", http.StripPrefix("/app", s.handlerApp.ServeAppFiles()))
+
+	s.mux.Handle("/swagger/", httpSwagger.Handler())
 }

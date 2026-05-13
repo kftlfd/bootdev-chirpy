@@ -25,6 +25,10 @@ func NewHandlerApp(cfg *config.Config, m *metrics.Metrics) *HandlerApp {
 	}
 }
 
+// @summary	Static file
+// @tags		App
+// @router		/app/{path} [get]
+// @param		path	path	string	false	"path to file"
 func (h *HandlerApp) ServeAppFiles() http.Handler {
 	fs := http.FileServer(http.Dir(h.cfg.FsRoot))
 

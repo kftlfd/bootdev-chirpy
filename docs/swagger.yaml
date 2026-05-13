@@ -1,0 +1,299 @@
+definitions:
+  handlers.accessTokenResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  handlers.chirpDto:
+    properties:
+      body:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handlers.createChirpBody:
+    properties:
+      body:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handlers.upgradeUserEvent:
+    properties:
+      data:
+        properties:
+          user_id:
+            type: string
+        type: object
+      event:
+        enum:
+        - user.upgraded
+        type: string
+    type: object
+  handlers.userDTO:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_chirpy_red:
+        type: boolean
+      updated_at:
+        type: string
+    type: object
+  handlers.userInputBody:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.userWithTokensDTO:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_chirpy_red:
+        type: boolean
+      refresh_token:
+        type: string
+      token:
+        type: string
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Chirpy backend API
+  title: Chirpy API
+  version: "1.0"
+paths:
+  /admin/metrics:
+    get:
+      produces:
+      - text/html
+      responses: {}
+      summary: View Metrics
+      tags:
+      - API admin
+  /admin/reset:
+    post:
+      produces:
+      - application/json
+      responses: {}
+      summary: Reset DB and metrics
+      tags:
+      - API admin
+  /api/chirps:
+    get:
+      parameters:
+      - description: Filter by creator
+        in: query
+        name: author_id
+        type: string
+      - description: Sort
+        enum:
+        - asc
+        - desc
+        in: query
+        name: sort
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.chirpDto'
+            type: array
+      summary: List chirps
+      tags:
+      - API chirps
+    post:
+      parameters:
+      - description: Input
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createChirpBody'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.chirpDto'
+      security:
+      - BearerAuth: []
+      summary: Create chirp
+      tags:
+      - API chirps
+  /api/chirps/{id}:
+    delete:
+      parameters:
+      - description: Chirp ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete chirp
+      tags:
+      - API chirps
+    get:
+      parameters:
+      - description: Chirp ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.chirpDto'
+      summary: Get chirp
+      tags:
+      - API chirps
+  /api/healthz:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Health
+      tags:
+      - API admin
+  /api/login:
+    post:
+      parameters:
+      - description: Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.userInputBody'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.userWithTokensDTO'
+      summary: Login
+      tags:
+      - API users
+  /api/polka/webhooks:
+    post:
+      parameters:
+      - description: Event
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.upgradeUserEvent'
+      responses:
+        "204":
+          description: No Content
+      security:
+      - ApiKeyAuth: []
+      summary: Upgrade user
+      tags:
+      - API users
+  /api/refresh:
+    post:
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.accessTokenResponse'
+      security:
+      - RefreshAuth: []
+      summary: Get new access token
+      tags:
+      - API users
+  /api/revoke:
+    post:
+      responses:
+        "204":
+          description: No Content
+      security:
+      - RefreshAuth: []
+      summary: Revoke refresh token
+      tags:
+      - API users
+  /api/users:
+    post:
+      parameters:
+      - description: Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.userInputBody'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.userDTO'
+      summary: Create user
+      tags:
+      - API users
+    put:
+      parameters:
+      - description: Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.userInputBody'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.userDTO'
+      security:
+      - BearerAuth: []
+      summary: Update user
+      tags:
+      - API users
+  /app/{path}:
+    get:
+      parameters:
+      - description: path to file
+        in: path
+        name: path
+        type: string
+      responses: {}
+      summary: Static file
+      tags:
+      - App
+securityDefinitions:
+  ApiKeyAuth:
+    description: 'API key. Example: "ApiKey {api_key}"'
+    in: header
+    name: Authorization
+    type: apiKey
+  BearerAuth:
+    description: 'JWT access token. Example: "Bearer {JWT}"'
+    in: header
+    name: Authorization
+    type: apiKey
+  RefreshAuth:
+    description: 'Refresh token. Example: "Bearer {refresh_token}"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

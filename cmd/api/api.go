@@ -1,6 +1,26 @@
+//	@title			Chirpy API
+//	@version		1.0
+//	@description	Chirpy backend API
+
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				JWT access token. Example: "Bearer {JWT}"
+
+//	@securityDefinitions.apikey	RefreshAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Refresh token. Example: "Bearer {refresh_token}"
+
+//	@securityDefinitions.apikey	ApiKeyAuth
+//	@in							header
+//	@name						Authorization
+//	@description				API key. Example: "ApiKey {api_key}"
+
 package main
 
 import (
+	_ "chirpy/docs"
 	"chirpy/internal/app"
 	"chirpy/internal/config"
 	"database/sql"

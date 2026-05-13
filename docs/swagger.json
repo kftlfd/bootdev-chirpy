@@ -1,0 +1,474 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Chirpy backend API",
+        "title": "Chirpy API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "paths": {
+        "/admin/metrics": {
+            "get": {
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "API admin"
+                ],
+                "summary": "View Metrics",
+                "responses": {}
+            }
+        },
+        "/admin/reset": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API admin"
+                ],
+                "summary": "Reset DB and metrics",
+                "responses": {}
+            }
+        },
+        "/api/chirps": {
+            "get": {
+                "tags": [
+                    "API chirps"
+                ],
+                "summary": "List chirps",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by creator",
+                        "name": "author_id",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "description": "Sort",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.chirpDto"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "API chirps"
+                ],
+                "summary": "Create chirp",
+                "parameters": [
+                    {
+                        "description": "Input",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.createChirpBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.chirpDto"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/chirps/{id}": {
+            "get": {
+                "tags": [
+                    "API chirps"
+                ],
+                "summary": "Get chirp",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chirp ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.chirpDto"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "API chirps"
+                ],
+                "summary": "Delete chirp",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chirp ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/api/healthz": {
+            "get": {
+                "tags": [
+                    "API admin"
+                ],
+                "summary": "Health",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/login": {
+            "post": {
+                "tags": [
+                    "API users"
+                ],
+                "summary": "Login",
+                "parameters": [
+                    {
+                        "description": "Payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.userInputBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.userWithTokensDTO"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/polka/webhooks": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "tags": [
+                    "API users"
+                ],
+                "summary": "Upgrade user",
+                "parameters": [
+                    {
+                        "description": "Event",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.upgradeUserEvent"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/api/refresh": {
+            "post": {
+                "security": [
+                    {
+                        "RefreshAuth": []
+                    }
+                ],
+                "tags": [
+                    "API users"
+                ],
+                "summary": "Get new access token",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.accessTokenResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/revoke": {
+            "post": {
+                "security": [
+                    {
+                        "RefreshAuth": []
+                    }
+                ],
+                "tags": [
+                    "API users"
+                ],
+                "summary": "Revoke refresh token",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/api/users": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "API users"
+                ],
+                "summary": "Update user",
+                "parameters": [
+                    {
+                        "description": "Payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.userInputBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.userDTO"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "API users"
+                ],
+                "summary": "Create user",
+                "parameters": [
+                    {
+                        "description": "Payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.userInputBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.userDTO"
+                        }
+                    }
+                }
+            }
+        },
+        "/app/{path}": {
+            "get": {
+                "tags": [
+                    "App"
+                ],
+                "summary": "Static file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "path to file",
+                        "name": "path",
+                        "in": "path"
+                    }
+                ],
+                "responses": {}
+            }
+        }
+    },
+    "definitions": {
+        "handlers.accessTokenResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.chirpDto": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.createChirpBody": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.upgradeUserEvent": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "user_id": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "event": {
+                    "type": "string",
+                    "enum": [
+                        "user.upgraded"
+                    ]
+                }
+            }
+        },
+        "handlers.userDTO": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_chirpy_red": {
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.userInputBody": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.userWithTokensDTO": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_chirpy_red": {
+                    "type": "boolean"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "description": "API key. Example: \"ApiKey {api_key}\"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        },
+        "BearerAuth": {
+            "description": "JWT access token. Example: \"Bearer {JWT}\"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        },
+        "RefreshAuth": {
+            "description": "Refresh token. Example: \"Bearer {refresh_token}\"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

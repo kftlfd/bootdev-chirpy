@@ -85,11 +85,19 @@ func censorChirp(chirp string) string {
 	return strings.Join(words, " ")
 }
 
+type createChirpBody struct {
+	Body   string    `json:"body"`
+	UserId uuid.UUID `json:"user_id"`
+}
+
+// @summary	Create chirp
+// @tags		API chirps
+// @router		/api/chirps [post]
+// @security	BearerAuth
+// @param		request	body		createChirpBody	true	"Input"
+// @success	201		{object}	chirpDto
 func (h *HandlerChirps) CreateChirp(w http.ResponseWriter, r *http.Request) {
-	reqBody := struct {
-		Body   string    `json:"body"`
-		UserId uuid.UUID `json:"user_id"`
-	}{}
+	reqBody := createChirpBody{}
 
 	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
 		h.res.JSONError(w, http.StatusBadRequest,
@@ -117,6 +125,12 @@ func (h *HandlerChirps) CreateChirp(w http.ResponseWriter, r *http.Request) {
 	h.res.JSON(w, http.StatusCreated, toChirpDTO(chirp))
 }
 
+// @summary	List chirps
+// @tags		API chirps
+// @router		/api/chirps [get]
+// @param		author_id	query		string	false	"Filter by creator"
+// @param		sort		query		string	false	"Sort"	Enums(asc, desc)
+// @success	200			{object}	[]chirpDto
 func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
 	authorId := r.URL.Query().Get("author_id")
 	sortOrd := r.URL.Query().Get("sort")
@@ -155,6 +169,11 @@ func (h *HandlerChirps) GetAllChirps(w http.ResponseWriter, r *http.Request) {
 	h.res.JSON(w, http.StatusOK, dtos)
 }
 
+// @summary	Get chirp
+// @tags		API chirps
+// @router		/api/chirps/{id} [get]
+// @param		id	path		string	true	"Chirp ID"
+// @success	200	{object}	chirpDto
 func (h *HandlerChirps) GetChirp(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -173,6 +192,12 @@ func (h *HandlerChirps) GetChirp(w http.ResponseWriter, r *http.Request) {
 	h.res.JSON(w, http.StatusOK, toChirpDTO(chirp))
 }
 
+// @summary	Delete chirp
+// @tags		API chirps
+// @router		/api/chirps/{id} [delete]
+// @security	BearerAuth
+// @param		id	path	string	true	"Chirp ID"
+// @success	204
 func (h *HandlerChirps) DeleteChirp(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {

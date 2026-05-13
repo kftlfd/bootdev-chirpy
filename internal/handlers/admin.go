@@ -41,6 +41,10 @@ func NewHandlerAdmin(cfg *config.Config, logger *slog.Logger, db *database.Queri
 	}
 }
 
+// @summary	Health
+// @tags		API admin
+// @router		/api/healthz [get]
+// @success	200	{string}	string	Ok
 func (h *HandlerAdmin) HandleHealth(w http.ResponseWriter, _ *http.Request) {
 	h.res.Text(w, http.StatusOK, []byte("OK"))
 }
@@ -54,11 +58,19 @@ func getMetricsHtml(visits int32) string {
 </html>`, visits)
 }
 
+// @summary	View Metrics
+// @tags		API admin
+// @router		/admin/metrics [get]
+// @produce	html
 func (h *HandlerAdmin) MetricsHandler(w http.ResponseWriter, _ *http.Request) {
 	html := getMetricsHtml(h.metrics.FileserverHits.Load())
 	h.res.HTML(w, http.StatusOK, []byte(html))
 }
 
+// @summary	Reset DB and metrics
+// @tags		API admin
+// @router		/admin/reset [post]
+// @Produce	json
 func (h *HandlerAdmin) ResetMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	if !h.cfg.IsDev {
 		h.res.JSONError(w, http.StatusForbidden, "unsafe operation")

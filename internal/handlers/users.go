@@ -71,11 +71,18 @@ func toUserWithTokensDTO(user database.User, jwt string, refreshToken string) us
 	}
 }
 
+type userInputBody struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// @summary	Create user
+// @tags		API users
+// @router		/api/users [post]
+// @param		request	body		userInputBody	true	"Payload"
+// @success	201		{object}	userDTO
 func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
-	reqBody := struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}{}
+	reqBody := userInputBody{}
 
 	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
 		h.res.JSONError(w, http.StatusBadRequest,
@@ -108,11 +115,14 @@ func (h *HandlerUsers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	h.res.JSON(w, http.StatusCreated, toUserDTO(user))
 }
 
+// @summary	Update user
+// @tags		API users
+// @router		/api/users [put]
+// @security	BearerAuth
+// @param		request	body		userInputBody	true	"Payload"
+// @success	201		{object}	userDTO
 func (h *HandlerUsers) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	reqBody := struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}{}
+	reqBody := userInputBody{}
 
 	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
 		h.res.JSONError(w, http.StatusBadRequest,
@@ -143,11 +153,13 @@ func (h *HandlerUsers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	h.res.JSON(w, http.StatusOK, toUserDTO(user))
 }
 
+// @summary	Login
+// @tags		API users
+// @router		/api/login [post]
+// @param		request	body		userInputBody	true	"Payload"
+// @success	200		{object}	userWithTokensDTO
 func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
-	reqBody := struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}{}
+	reqBody := userInputBody{}
 
 	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
 		h.res.JSONError(w, http.StatusBadRequest,
@@ -196,6 +208,15 @@ func (h *HandlerUsers) Login(w http.ResponseWriter, r *http.Request) {
 	h.res.JSON(w, http.StatusOK, respBody)
 }
 
+type accessTokenResponse struct {
+	Token string `json:"token"`
+}
+
+// @summary	Get new access token
+// @tags		API users
+// @router		/api/refresh [post]
+// @security	RefreshAuth
+// @success	201	{object}	accessTokenResponse
 func (h *HandlerUsers) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	rToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
@@ -218,11 +239,14 @@ func (h *HandlerUsers) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.res.JSON(w, http.StatusOK, httpx.D{
-		"token": jwt,
-	})
+	h.res.JSON(w, http.StatusOK, accessTokenResponse{Token: jwt})
 }
 
+// @summary	Revoke refresh token
+// @tags		API users
+// @router		/api/revoke [post]
+// @security	RefreshAuth
+// @success	204
 func (h *HandlerUsers) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	rToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
@@ -241,6 +265,19 @@ func (h *HandlerUsers) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type upgradeUserEvent struct {
+	Event string `json:"event" enums:"user.upgraded"`
+	Data  struct {
+		UserId string `json:"user_id"`
+	} `json:"data"`
+}
+
+// @summary	Upgrade user
+// @tags		API users
+// @router		/api/polka/webhooks [post]
+// @security	ApiKeyAuth
+// @param		request	body	upgradeUserEvent	true	"Event"
+// @success	204
 func (h *HandlerUsers) WebhookUpgradeUser(w http.ResponseWriter, r *http.Request) {
 	apiKey, err := auth.GetAPIKey(r.Header)
 	if err != nil || apiKey != h.cfg.Env.PolkaKey {
@@ -248,12 +285,7 @@ func (h *HandlerUsers) WebhookUpgradeUser(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	reqBody := struct {
-		Event string `json:"event"`
-		Data  struct {
-			UserId string `json:"user_id"`
-		} `json:"data"`
-	}{}
+	reqBody := upgradeUserEvent{}
 
 	if err := httpx.DecodeJSON(r, &reqBody); err != nil {
 		h.res.JSONError(w, http.StatusBadRequest,
