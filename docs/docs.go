@@ -376,9 +376,6 @@ const docTemplate = `{
             "properties": {
                 "body": {
                     "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
                 }
             }
         },

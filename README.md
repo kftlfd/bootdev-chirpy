@@ -62,5 +62,5 @@ go build ./cmd/chirpy
   ```bash
   # install swaggo/swag
   $ swag fmt
-  $ swag init -g cmd/api/api.go
+  $ swag init -g cmd/chirpy/main.go
   ```
