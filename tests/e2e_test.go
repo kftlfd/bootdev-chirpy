@@ -33,7 +33,7 @@ func TestCreateUser(t *testing.T) {
 		{"no email", `{"email2": ""}`, 400},
 		{"no pass", `{"passw": ""}`, 400},
 		{"ok", `{"email": "hey1", "password": "ho"}`, 201},
-		{"duplicate email", `{"email": "hey1", "password": "ho"}`, 500},
+		{"duplicate email", `{"email": "hey1", "password": "ho"}`, 400},
 	}
 
 	for _, tc := range testCases {
